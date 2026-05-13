@@ -2,47 +2,46 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Host Master Dashboard</title>
+    <title>Host Master Hub</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { font-family: 'Arial', sans-serif; background: #050505; color: #fff; margin: 0; padding: 20px; }
-        .quiz-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
+        .quiz-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; text-align: center; margin-bottom: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .panel { background: #111; border-radius: 20px; padding: 20px; border: 1px solid #333; }
         .player-row { display: flex; justify-content: space-between; background: rgba(255,255,255,0.03); margin-bottom: 8px; padding: 10px 20px; border-radius: 10px; }
-        
-        .chip { padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-        .chip-A { background: #ff4757; }
-        .chip-B { background: #2ed573; }
-        .chip-C { background: #1e90ff; }
-        .chip-D { background: #ffa502; }
-        
+        .chip { padding: 4px 12px; border-radius: 20px; font-weight: bold; }
+        .chip-A { background: #ff4757; } .chip-B { background: #2ed573; } .chip-C { background: #1e90ff; } .chip-D { background: #ffa502; }
         button { padding: 12px 25px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; margin: 5px; }
-        .btn-main { background: #00d2ff; color: #000; }
+        #roulette-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.85);
+            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000;
+        }
     </style>
 </head>
 <body>
 
+    <div id="roulette-overlay">
+        <h1 style="font-size: 80px;">🚨 RUSSIAN ROULETTE 🚨</h1>
+        <h2 id="roulette-msg" style="font-size: 30px;">ระบบกำลังสุ่มผู้เคราะห์ร้ายจาก Top 5...</h2>
+        <h1 id="victim-name" style="font-size: 60px; color: yellow;"></h1>
+    </div>
+
     <div class="quiz-card" id="quiz-area" style="display:none;">
-        <h1 id="tv-question" style="font-size: 40px;">กดเริ่มเกมเพื่อดึงคำถาม</h1>
-        <div id="choices-display" style="display:flex; justify-content: center; gap: 20px; font-size: 20px; margin: 15px 0;"></div>
-        <button class="btn-main" onclick="nextRound()">✅ เฉลยและข้อถัดไป</button>
+        <h2 id="round-num" style="margin:0; opacity:0.7;"></h2>
+        <h1 id="tv-question" style="font-size: 40px; margin: 15px 0;"></h1>
+        <div id="choices-display" style="display:flex; justify-content: center; gap: 15px; margin-bottom: 20px;"></div>
+        <button style="background:#ffd700; color:black; font-size:20px;" onclick="nextRound()">✅ เฉลยและข้อถัดไป</button>
     </div>
 
     <div style="text-align: center; margin-bottom: 20px;">
-        <button id="start-btn" class="btn-main" onclick="startGame()">🚀 เริ่มเกม (ล็อคห้อง)</button>
+        <button id="start-btn" style="background:#00d2ff; padding:20px 40px; font-size:24px;" onclick="startGame()">🚀 เริ่มเกม (10 ข้อ)</button>
     </div>
 
     <div class="grid">
-        <div class="panel">
-            <h3>🏆 Leaderboard</h3>
-            <div id="player-list"></div>
-        </div>
-        <div class="panel">
-            <h3>📊 กระดานเดิมพัน</h3>
-            <div id="bet-board"></div>
-        </div>
+        <div class="panel"><h3>🏆 Leaderboard</h3><div id="player-list"></div></div>
+        <div class="panel"><h3>📊 Betting Board</h3><div id="bet-board"></div></div>
     </div>
 
 <script>
@@ -60,15 +59,20 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // คลังคำถามแบบ 4 ตัวเลือก
     const quizData = [
-        { q: "1 + 1 = ?", options: {A:"1", B:"2", C:"3", D:"4"}, correct: "B" },
-        { q: "What color is the sky?", options: {A:"Red", B:"Green", C:"Blue", D:"Black"}, correct: "C" },
-        { q: "Synonym of 'Fast'?", options: {A:"Slow", B:"Quick", C:"Heavy", D:"Light"}, correct: "B" }
+        { q: "1. 7 + 8 = ?", options: {A:"13", B:"14", C:"15", D:"16"}, correct: "C" },
+        { q: "2. วันใดคือวันคริสต์มาส?", options: {A:"24 Dec", B:"25 Dec", C:"26 Dec", D:"1 Jan"}, correct: "B" },
+        { q: "3. ข้อใดคือสีของกล้วยสุก?", options: {A:"แดง", B:"เขียว", C:"น้ำเงิน", D:"เหลือง"}, correct: "D" },
+        { q: "4. แมวมีกี่ขา?", options: {A:"2 ขา", B:"3 ขา", C:"4 ขา", D:"5 ขา"}, correct: "C" },
+        { q: "5. ท้องฟ้าปกติสีอะไร?", options: {A:"ฟ้า", B:"ดำ", C:"ชมพู", D:"ม่วง"}, correct: "A" },
+        { q: "6. เมืองหลวงไทยคือ?", options: {A:"เชียงใหม่", B:"ภูเก็ต", C:"กรุงเทพฯ", D:"อยุธยา"}, correct: "C" },
+        { q: "7. สัตว์อะไรคอยาวที่สุด?", options: {A:"ม้าลาย", B:"ยีราฟ", C:"ช้าง", D:"เป็ด"}, correct: "B" },
+        { q: "8. 10 x 10 = ?", options: {A:"10", B:"100", C:"1000", D:"0"}, correct: "B" },
+        { q: "9. สัตว์อะไรบินได้?", options: {A:"สุนัข", B:"แมว", C:"นก", D:"ปลา"}, correct: "C" },
+        { q: "10. ข้อสุดท้าย! 1 นาที มีกี่วินาที?", options: {A:"30", B:"50", C:"60", D:"100"}, correct: "C" }
     ];
 
     let currentRound = 0;
-    db.ref('room').set({ status: "waiting" });
     db.ref('players').remove();
 
     db.ref('players').on('value', snapshot => {
@@ -76,18 +80,14 @@
         const playerList = document.getElementById('player-list');
         const betBoard = document.getElementById('bet-board');
         playerList.innerHTML = ''; betBoard.innerHTML = '';
-
         const sorted = Object.keys(players).map(k => ({...players[k], id: k})).sort((a,b) => b.money - a.money);
         sorted.forEach(p => {
             playerList.innerHTML += `<div class='player-row'><span>${p.name}</span><span style='color:#ffd700'>฿${p.money.toLocaleString()}</span></div>`;
-            if(p.betSide) {
-                betBoard.innerHTML += `<div class='player-row'><span>${p.name}</span><span class='chip chip-${p.betSide}'>${p.betSide} (฿${p.betAmount.toLocaleString()})</span></div>`;
-            }
+            if(p.betSide) betBoard.innerHTML += `<div class='player-row'><span>${p.name}</span><span class='chip chip-${p.betSide}'>${p.betSide} (฿${p.betAmount.toLocaleString()})</span></div>`;
         });
     });
 
     function startGame() {
-        db.ref('room/status').set("playing");
         document.getElementById('start-btn').style.display = 'none';
         document.getElementById('quiz-area').style.display = 'block';
         loadQuestion();
@@ -95,21 +95,17 @@
 
     function loadQuestion() {
         if(currentRound >= quizData.length) {
-            document.getElementById('tv-question').innerText = "จบเกม!";
+            document.getElementById('tv-question').innerText = "🏁 จบเกมแล้ว! ใครรวยที่สุดชนะ!";
+            document.getElementById('choices-display').innerHTML = "";
             return;
         }
         const data = quizData[currentRound];
-        document.getElementById('tv-question').innerText = `ข้อ ${currentRound+1}: ${data.q}`;
-        
+        document.getElementById('round-num').innerText = `ข้อที่ ${currentRound+1}/10`;
+        document.getElementById('tv-question').innerText = data.q;
         let choiceHtml = "";
-        for(let key in data.options) {
-            choiceHtml += `<span class='chip chip-${key}'>${key}: ${data.options[key]}</span>`;
-        }
+        for(let key in data.options) choiceHtml += `<span class='chip chip-${key}'>${key}: ${data.options[key]}</span>`;
         document.getElementById('choices-display').innerHTML = choiceHtml;
-
-        db.ref('players').once('value', snapshot => {
-            snapshot.forEach(c => c.ref.update({ betSide: "", betAmount: 0 }));
-        });
+        db.ref('players').once('value', snapshot => snapshot.forEach(c => c.ref.update({ betSide: "", betAmount: 0 })));
     }
 
     function nextRound() {
@@ -117,16 +113,53 @@
         db.ref('players').once('value', snapshot => {
             snapshot.forEach(child => {
                 let p = child.val();
-                if(p.betSide === correctAns) {
-                    child.ref.update({ money: p.money + p.betAmount });
-                } else if(p.betSide !== "") {
-                    child.ref.update({ money: p.money - p.betAmount });
-                }
+                if(p.betSide === correctAns) child.ref.update({ money: p.money + p.betAmount });
+                else if(p.betSide !== "") child.ref.update({ money: p.money - p.betAmount });
             });
         });
+
         currentRound++;
-        setTimeout(loadQuestion, 1000);
+        
+        // เงื่อนไข: ถ้าจบข้อ 5 (Index คือ 5 พอดีหลังจากเพิ่ม) ให้ทำ Russian Roulette
+        if (currentRound === 5) {
+            setTimeout(runRussianRoulette, 1500);
+        } else {
+            setTimeout(loadQuestion, 1500);
+        }
+    }
+
+    function runRussianRoulette() {
+        const overlay = document.getElementById('roulette-overlay');
+        overlay.style.display = 'flex';
+        
+        db.ref('players').once('value', snapshot => {
+            let list = [];
+            snapshot.forEach(c => list.push({id: c.key, name: c.val().name, money: c.val().money}));
+            list.sort((a,b) => b.money - a.money);
+            
+            let top5 = list.slice(0, 5);
+            if(top5.length > 0) {
+                let victim = top5[Math.floor(Math.random() * top5.length)];
+                let penalty = Math.floor(victim.money * 0.25);
+                
+                setTimeout(() => {
+                    document.getElementById('victim-name').innerText = `💥 ${victim.name} 💥`;
+                    document.getElementById('roulette-msg').innerText = `โดนตัดเงิน 25% (฿${penalty.toLocaleString()})`;
+                    db.ref(`players/${victim.id}`).update({ money: victim.money - penalty });
+                    
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        document.getElementById('victim-name').innerText = "";
+                        loadQuestion();
+                    }, 4000);
+                }, 2000);
+            } else {
+                overlay.style.display = 'none';
+                loadQuestion();
+            }
+        });
     }
 </script>
 </body>
 </html>
+
